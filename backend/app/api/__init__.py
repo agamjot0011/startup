@@ -9,6 +9,7 @@ from app.api.routes.operations import router as operations_router
 from app.api.routes.notifications import router as notifications_router
 from app.api.routes.pms_imports import router as pms_imports_router
 from app.api.routes.governance import router as governance_router
+from app.api.routes.messages import router as messages_router
 from app.api.routes.sessions import router as sessions_router
 from app.api.routes.family import router as family_router
 from app.api.routes.patients import router as patients_router
@@ -40,6 +41,7 @@ api_router.include_router(operations_router)
 api_router.include_router(notifications_router)
 api_router.include_router(pms_imports_router)
 api_router.include_router(governance_router)
+api_router.include_router(messages_router)
 api_router.include_router(sessions_router)
 api_router.include_router(family_router)
 api_router.include_router(patients_router)

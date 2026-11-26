@@ -5,6 +5,7 @@ from app.api.routes.auth import router as auth_router
 from app.api.routes.events import router as events_router
 from app.api.routes.triage import router as triage_router
 from app.api.routes.briefs import router as briefs_router
+from app.api.routes.operations import router as operations_router
 from app.api.routes.sessions import router as sessions_router
 from app.api.routes.family import router as family_router
 from app.api.routes.patients import router as patients_router
@@ -32,6 +33,7 @@ api_router.include_router(auth_router)
 api_router.include_router(events_router)
 api_router.include_router(triage_router)
 api_router.include_router(briefs_router)
+api_router.include_router(operations_router)
 api_router.include_router(sessions_router)
 api_router.include_router(family_router)
 api_router.include_router(patients_router)

@@ -26,23 +26,35 @@ def test_ready_health():
     assert response.json()["database"] == "connected"
 
 
+def _auth_headers():
+    sign_in = client.post(
+        "/v1/sessions", json={"session": "smoke-user", "password": "smoke-password"}
+    )
+    assert sign_in.status_code == 200
+    return {"Authorization": f"Bearer {sign_in.json()['session_id']}"}
+
+
 def test_v1_me_endpoint():
-    response = client.get("/v1/me")
+    response = client.get("/v1/me", headers=_auth_headers())
     assert response.status_code == 200
     body = response.json()
-    assert "actor_type" in body
+    assert "user_id" in body
     assert "safe_prompts" in body
 
 
 def test_v1_session_context():
-    response = client.post("/v1/sessions/practice-context")
+    response = client.post(
+        "/v1/sessions/practice-context",
+        json={"practice_id": "wzdm-01", "expected_session_version": 1},
+        headers=_auth_headers(),
+    )
     assert response.status_code == 200
     body = response.json()
     assert body["active"] is True
 
 
 def test_v1_session_revoke():
-    response = client.delete("/v1/sessions/current")
+    response = client.delete("/v1/sessions/current", headers=_auth_headers())
     assert response.status_code == 204
 
 

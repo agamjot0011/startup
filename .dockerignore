@@ -1,0 +1,31 @@
+# Keep secrets and local state out of the build context and the image.
+.git
+.gitignore
+**/.env
+**/.env.*
+!**/.env.example
+**/*.key
+**/*.pem
+credentials.json
+
+# Local environments, caches and build outputs.
+**/venv/
+**/.venv/
+**/node_modules/
+**/__pycache__/
+**/*.py[cod]
+**/.pytest_cache/
+**/.mypy_cache/
+**/.ruff_cache/
+**/dist/
+**/build/
+artifacts/
+*.log
+
+# Frontend is built by CI, not baked into the backend image.
+frontend/
+
+# Internal / confidential material must never enter an image layer.
+HANDBOOK_EXTRACTED.txt
+HANDBOOK_GAPS.md
+BACKEND_AUDIT.md

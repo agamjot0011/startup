@@ -1,0 +1,18 @@
+# Example only. Copy to dev.tfvars and replace the storage account name with a
+# globally unique value. NEVER commit real credentials, keys or PHI.
+environment                  = "dev"
+location                     = "eastus"
+resource_group_name          = "rg-wzdm-dev"
+storage_account_name         = "stgzdmdev00000001" # TODO: make globally unique
+log_analytics_workspace_name = "log-wzdm-dev"
+log_retention_days           = 30
+
+# Leave empty until a human provisions the CI principal in a separated account.
+ci_principal_id = ""
+
+tags = {
+  project    = "wzdm-liverecord"
+  phase      = "g1"
+  data_class = "synthetic-no-phi"
+  owner      = "platform-team"
+}

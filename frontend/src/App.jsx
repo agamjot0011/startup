@@ -11,10 +11,20 @@ const queryClient = new QueryClient({
 const API_BASE = 'http://localhost:4000'
 
 async function request(path, options = {}) {
-  const res = await fetch(`${API_BASE}${path}`, {
-    ...options,
-    headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
-  })
+  let token = null
+  try {
+    const stored = localStorage.getItem('wzdm_session')
+    if (stored) {
+      const session = JSON.parse(stored)
+      token = session.access_token || session.session_id || null
+    }
+  } catch { /* ignore malformed stored session */ }
+  const headers = {
+    'Content-Type': 'application/json',
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...(options.headers || {}),
+  }
+  const res = await fetch(`${API_BASE}${path}`, { ...options, headers })
   if (res.status === 204) return null
   const body = await res.json().catch(() => ({}))
   if (!res.ok) throw new Error(body.detail || `Request failed: ${res.status}`)

@@ -166,10 +166,23 @@ def alpha_sign_in(payload: AlphaSignInRequest, response: Response):
         raise HTTPException(status_code=400, detail="Session identifier and password are required")
     if payload.session in _deactivated_users:
         raise HTTPException(status_code=401, detail="Access unavailable")
+    identifier = payload.session.strip().lower()
+    role = "orthodontist"
+    for prefix, candidate in (
+        ("patient-", "patient"), ("guardian-", "guardian"),
+        ("assistant-", "clinical_assistant"), ("frontdesk-", "front_desk"),
+        ("manager-", "practice_manager"), ("dentist-", "orthodontist"),
+    ):
+        if identifier.startswith(prefix):
+            role = candidate
+            break
     record = session_store.create(
         user_id=payload.session,
         assurance="medium",
         auth_methods=["oidc_alpha", "mfa_alpha"],
+        practice_id="wzdm-01",
+        membership_id="membership-wzdm-01",
+        roles=[role],
     )
     response.set_cookie("wzdm_session", record.session_id, httponly=True, samesite="lax")
     return {

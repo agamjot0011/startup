@@ -725,9 +725,14 @@ function ReportProblemPage() {
   const [msg, setMsg] = useState('')
   const { patientId } = useParams()
   async function onSubmit(data) {
+    setMsg('')
     try {
-      const body = await api.post(`/v1/patients/${patientId || 'p-1042'}/problem-reports`, data)
-      setMsg(`Report submitted · ${body.report_id || 'received'}`)
+      const body = await api.post(`/v1/reports/${patientId || 'p-1042'}/reports`, {
+        title: data.title,
+        description: data.description,
+        photo_attached: data.photo ? true : false,
+      })
+      setMsg(`Report submitted · ${body.report_id || 'received'} · awaiting human triage`)
     } catch (e) { setMsg(e.message || 'Could not submit report') }
   }
   return (
@@ -804,16 +809,36 @@ function AccessSharing() {
 function TriagePage() {
   const { reportId } = useParams()
   const [decision, setDecision] = useState('')
+  const [instruction, setInstruction] = useState('')
+  const [msg, setMsg] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [triagedNow, setTriagedNow] = useState(false)
+  const report = useApiData(`/v1/reports/${reportId || 'r-88'}`, null)
+
+  async function submit() {
+    setMsg(''); setBusy(true)
+    try {
+      const body = await api.post(`/v1/problem-reports/${reportId || 'r-88'}/triage`, {
+        urgency: decision,
+        approved_instruction: instruction,
+      })
+      setTriagedNow(true)
+      setMsg(`Recorded · ${body.urgency} · decided ${Number(body.triage_latency_seconds || 0).toFixed(1)}s after submission`)
+    } catch (e) { setMsg(e.message || 'Could not record triage') }
+    finally { setBusy(false) }
+  }
+
+  const awaiting = !triagedNow && (!report || report.status === 'AWAITING_HUMAN_TRIAGE')
   return (
     <>
       <PageHeader eyebrow="Patient care · human review" title="Report triage"
         description="Urgency is assigned by a person. No machine-generated conclusion is shown."
-        actions={<Pill tone="urgent">Awaiting triage</Pill>} />
+        actions={<Pill tone={awaiting ? 'urgent' : 'done'}>{awaiting ? 'Awaiting triage' : 'Triaged'}</Pill>} />
       <div className="split-view">
         <Panel title="Submitted report" subtitle={`Report ${reportId || 'r-88'}`}>
           <dl className="kv-grid">
-            <KeyValue label="Patient" value="Jo Santos" />
-            <KeyValue label="Submitted" value="Today, 08:42" />
+            <KeyValue label="Patient" value={report?.patient_id || 'p-1042'} />
+            <KeyValue label="Submitted" value={report?.received_at ? new Date(report.received_at).toLocaleString() : '—'} />
             <KeyValue label="Channel" value="Family form" />
           </dl>
           <h3 className="subhead">Description</h3>
@@ -830,24 +855,70 @@ function TriagePage() {
             ].map((o) => (
               <button key={o.id} type="button"
                 className={cn('choice', decision === o.id && 'is-selected')}
-                onClick={() => setDecision(o.id)}>{o.label}</button>
+                onClick={() => setDecision(o.id)} disabled={!awaiting}>{o.label}</button>
             ))}
           </div>
           <Field label="Approved instruction" name="instruction">
-            <select name="instruction" defaultValue="">
+            <select name="instruction" value={instruction}
+              onChange={(e) => setInstruction(e.target.value)} disabled={!awaiting}>
               <option value="" disabled>Select an approved instruction…</option>
-              <option>Continue as directed; monitor and report changes</option>
-              <option>Contact the practice using the safe route</option>
-              <option>Attend an urgent clinical review</option>
+              <option value="continue_as_directed">Continue as directed; monitor and report changes</option>
+              <option value="contact_practice">Contact the practice using the safe route</option>
+              <option value="urgent_review">Attend an urgent clinical review</option>
             </select>
           </Field>
           <Field label="Route preview" name="route">
-            <textarea name="route" rows="3" readOnly defaultValue="Patient + nominated guardian · email only" />
+            <textarea name="route" rows="3" readOnly value="Patient + nominated guardian · in-app first · email notice" />
           </Field>
-          <Button disabled={!decision}>Record triage decision</Button>
+          {msg && <p className={msg.startsWith('Recorded') ? 'form-success' : 'form-error'} role="status">{msg}</p>}
+          <Button disabled={!decision || !instruction || busy || !awaiting} onClick={submit}>
+            {busy ? 'Recording…' : 'Record triage decision'}
+          </Button>
         </Panel>
       </div>
     </>
+  )
+}
+
+function ChairCaptureForm() {
+  const { appointmentId } = useParams()
+  const [captureType, setCaptureType] = useState('clinical_observation')
+  const [note, setNote] = useState('')
+  const [msg, setMsg] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  async function submit(e) {
+    e.preventDefault()
+    setMsg(''); setBusy(true)
+    try {
+      const body = await api.post('/v1/patients/p-1042/chairside-captures', {
+        appointment_id: appointmentId || 'a-771',
+        capture_type: captureType,
+        content: note,
+        checklist_version: 'chair-v3',
+      })
+      setMsg(`Captured · ${body.capture_id}`)
+      setNote('')
+    } catch (err) { setMsg(err.message || 'Could not capture') }
+    finally { setBusy(false) }
+  }
+
+  return (
+    <form className="stack-form narrow" onSubmit={submit}>
+      <Field label="Capture type" name="type">
+        <select name="type" value={captureType} onChange={(e) => setCaptureType(e.target.value)}>
+          <option value="clinical_observation">Clinical observation</option>
+          <option value="photo">Photo</option>
+          <option value="patient_statement">Patient statement</option>
+        </select>
+      </Field>
+      <Field label="Note" name="note">
+        <textarea name="note" rows="5" value={note} onChange={(e) => setNote(e.target.value)}
+          placeholder="Record only approved source content" required />
+      </Field>
+      {msg && <p className={msg.startsWith('Captured') ? 'form-success' : 'form-error'} role="status">{msg}</p>}
+      <Button type="submit" disabled={busy || !note.trim()}>{busy ? 'Saving…' : 'Add to visit source set'}</Button>
+    </form>
   )
 }
 
@@ -867,13 +938,7 @@ function ChairPage() {
           </dl>
         </Panel>
         <Panel title="Approved capture">
-          <form className="stack-form narrow" onSubmit={(e) => e.preventDefault()}>
-            <Field label="Capture type" name="type">
-              <select name="type"><option>Clinical observation</option><option>Photo</option><option>Patient statement</option></select>
-            </Field>
-            <Field label="Note" name="note"><textarea name="note" rows="5" placeholder="Record only approved source content" /></Field>
-            <Button>Add to visit source set</Button>
-          </form>
+          <ChairCaptureForm />
         </Panel>
       </div>
       <Panel title="Sources captured this visit">
@@ -890,11 +955,37 @@ function ChairPage() {
 }
 
 function BriefPage() {
+  const { appointmentId } = useParams()
+  const [msg, setMsg] = useState('')
+  const [busy, setBusy] = useState(false)
+  const brief = useApiData(`/v1/visit-briefs/${appointmentId || 'a-771'}`, null)
+
+  async function signOff() {
+    setMsg(''); setBusy(true)
+    try {
+      let current = brief
+      if (!current?.brief_id) {
+        current = await api.post('/v1/visit-briefs', {
+          appointment_id: appointmentId || 'a-771',
+          patient_id: 'p-1042',
+          events: TIMELINE.map((e) => ({ event_id: e.id, type: e.type, summary: e.title })),
+        })
+      }
+      const signature = await api.post(`/v1/visit-briefs/${current.brief_id}/signatures`, {
+        attestation: 'Reviewed source set and events since last visit',
+        expected_row_version: current.row_version || 1,
+      })
+      setMsg(`Signed · ${signature.signature_id} · hash ${signature.snapshot_hash.slice(0, 12)}…`)
+    } catch (e) { setMsg(e.message || 'Could not sign brief') }
+    finally { setBusy(false) }
+  }
+
   return (
     <>
       <PageHeader eyebrow="Doctor review" title="Visit brief"
         description="Events since the last visit, with source and freshness. Doctor signature closes the snapshot."
-        actions={<Button>Sign off brief</Button>} />
+        actions={<Button onClick={signOff} disabled={busy}>{busy ? 'Signing…' : brief?.signed ? 'Signed ✓' : 'Sign off brief'}</Button>} />
+      {msg && <p className={msg.startsWith('Signed') ? 'form-success' : 'form-error'} role="status">{msg}</p>}
       <Panel title="Since last visit">
         <DataTable columns={[
           { key: 'date', label: 'Date' }, { key: 'event', label: 'Event' },
@@ -917,12 +1008,20 @@ function BriefPage() {
 }
 
 function BookingPage() {
-  const rows = [
+  const live = useApiData('/v1/operations/front-desk-daily', null)
+  const rows = (live?.appointments || [
     { id: 1, time: '09:00', patient: 'A. Mehta', reason: 'Bond check', status: 'Confirmed', tone: 'success' },
     { id: 2, time: '10:30', patient: 'R. Okafor', reason: 'Debond review', status: 'Confirmed', tone: 'success' },
     { id: 3, time: '12:00', patient: 'J. Santos', reason: 'Problem follow-up', status: 'Needs confirmation', tone: 'pending' },
     { id: 4, time: '15:30', patient: 'M. Iyer', reason: 'Retainer fit', status: 'Waiting', tone: 'info' },
-  ]
+  ]).map((a, i) => ({
+    id: a.appointment_id || i,
+    time: a.scheduled_at ? new Date(a.scheduled_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : a.time,
+    patient: a.patient_id || a.patient,
+    reason: a.reason,
+    status: a.status === 'confirmed' ? 'Confirmed' : a.status,
+    tone: a.status === 'confirmed' ? 'success' : 'pending',
+  }))
   return (
     <>
       <PageHeader eyebrow="Front desk" title="Booking queue" description="Today's appointments and operational follow-up." />
@@ -938,11 +1037,20 @@ function BookingPage() {
 }
 
 function PromisesPage() {
-  const rows = [
+  const live = useApiData('/v1/operations/promises', null)
+  const rows = (live?.promises || [
     { id: 1, promise: 'Call back about retainer cost', patient: 'M. Iyer', owner: 'Front desk', due: 'Today', status: 'Open', tone: 'due' },
     { id: 2, promise: 'Send approved instruction sheet', patient: 'A. Mehta', owner: 'Assistant', due: 'Tomorrow', status: 'In progress', tone: 'active' },
     { id: 3, promise: 'Confirm appointment time', patient: 'T. Nguyen', owner: 'Front desk', due: 'Done', status: 'Closed', tone: 'done' },
-  ]
+  ]).map((p, i) => ({
+    id: p.promise_id || i,
+    promise: p.text || p.promise,
+    patient: p.patient_id || p.patient,
+    owner: p.owner_membership_id || p.owner,
+    due: p.due_at ? new Date(p.due_at).toLocaleString() : p.due,
+    status: p.state ? p.state.charAt(0).toUpperCase() + p.state.slice(1) : p.status,
+    tone: p.state === 'open' ? 'due' : 'info',
+  }))
   return (
     <>
       <PageHeader eyebrow="Front desk" title="Promises" description="What the practice committed to, with owner, deadline and result." />
@@ -958,6 +1066,8 @@ function PromisesPage() {
 }
 
 function HuddlePage() {
+  const notif = useApiData('/v1/notifications/health', null)
+  const counts = notif?.status_counts || {}
   return (
     <>
       <PageHeader eyebrow="Operations" title="Daily huddle" description="Practice-local preparation and open-work view." />
@@ -966,7 +1076,7 @@ function HuddlePage() {
           <div><span>Open cards</span><strong>7</strong><small>2 due today</small></div>
           <div><span>Overdue loops</span><strong>1</strong><small>Needs owner</small></div>
           <div><span>Reports to triage</span><strong>1</strong><small>Doctor review</small></div>
-          <div><span>Alert budget</span><strong>68%</strong><small>Within limit</small></div>
+          <div><span>Alerts queued</span><strong>{counts.PENDING ?? '—'}</strong><small>{counts.BLOCKED ? `${counts.BLOCKED} PHI-blocked` : 'Within limit'}</small></div>
         </div>
       </Panel>
       <div className="split-view">

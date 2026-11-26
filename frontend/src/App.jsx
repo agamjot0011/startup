@@ -275,7 +275,8 @@ function Shell({ mode }) {
             </div>
           </div>
         </header>
-        <main className="main-content"><Outlet /></main>
+        <main className="main-content" id="main-content" role="main"><Outlet /></main>
+        <div className="sr-only" aria-live="polite" aria-atomic="true" id="wzdm-status" />
       </div>
     </div>
   )

@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#13201D" />
+  <meta name="wzdm-safe-route-version" content="1.0.0" />
+  <meta name="wzdm-safe-route-attestation" content="first-party-static-no-api-no-storage" />
+  <title>Safe route & emergency contact — WZDM LiveRecord</title>
+  <style>
+    :root { --ink:#14201D; --muted:#62716C; --border:#E3E8E5; --accent:#0F766E; --canvas:#F6F7F5; }
+    * { box-sizing:border-box; }
+    body { margin:0; font-family:system-ui,-apple-system,'Segoe UI',sans-serif; color:var(--ink); background:var(--canvas); line-height:1.55; }
+    .wrap { max-width:760px; margin:0 auto; padding:48px 24px 64px; }
+    .mark { display:grid; place-items:center; width:34px; height:34px; border-radius:8px; background:var(--accent); color:#fff; font-weight:700; }
+    header { display:flex; align-items:center; gap:12px; margin-bottom:36px; font-weight:600; }
+    .eyebrow { font-family:ui-monospace,monospace; font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--accent); }
+    h1 { font-size:30px; letter-spacing:-.03em; margin:10px 0 8px; }
+    .lead { color:var(--muted); margin-bottom:28px; }
+    section { background:#fff; border:1px solid var(--border); border-radius:12px; padding:22px 24px; margin-bottom:16px; }
+    h2 { font-size:16px; margin:0 0 14px; }
+    dl { display:grid; grid-template-columns:180px 1fr; gap:12px 20px; margin:0; }
+    dt { color:var(--muted); font-size:13px; }
+    dd { margin:0; font-weight:600; }
+    a { color:var(--accent); }
+    .urgent { border-color:#F2D3CF; background:#FCEEEC; }
+    .urgent h2 { color:#B42318; }
+    footer { font-family:ui-monospace,monospace; font-size:11px; color:var(--muted); margin-top:28px; }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <header><span class="mark">W</span> WZDM LiveRecord</header>
+    <p class="eyebrow">Public information · always available</p>
+    <h1>Safe route &amp; emergency contact</h1>
+    <p class="lead">This page is bundled with the application and stays available even when the record system is offline. It contains no patient information.</p>
+
+    <section>
+      <h2>During practice hours</h2>
+      <dl>
+        <dt>Practice phone</dt><dd>(555) 010-2200</dd>
+        <dt>Emergency text</dt><dd>(555) 010-2211</dd>
+        <dt>Monitoring hours</dt><dd>Mon–Fri, 08:00–18:00</dd>
+      </dl>
+    </section>
+
+    <section class="urgent">
+      <h2>Outside monitoring hours</h2>
+      <p>For urgent dental or medical concerns, contact your local emergency service or emergency department. Do not wait for a reply through this system.</p>
+    </section>
+
+    <footer>
+      Release-safe static asset · version 1.0.0 · attestation: first-party-static-no-api-no-storage
+    </footer>
+  </main>
+</body>
+</html>

@@ -1,0 +1,9 @@
+{
+  "asset": "safe-route.html",
+  "version": "1.0.0",
+  "attestation": "first-party-static-no-api-no-storage",
+  "sha256": "664671ecc6c3ba8ebaac0192489a93f1a314d8e696c318b357a6ef147baa0f0c",
+  "generated_at": "2026-11-26T05:42:03.278Z",
+  "offline_capable": true,
+  "phi_free": true
+}

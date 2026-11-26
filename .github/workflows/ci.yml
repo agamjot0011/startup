@@ -94,7 +94,7 @@ jobs:
         working-directory: frontend
         run: |
           npm ci
-          npm run build
+          npm run build:checked
 
       - name: Upload frontend build output
         uses: actions/upload-artifact@v4

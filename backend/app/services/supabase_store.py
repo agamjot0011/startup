@@ -16,10 +16,19 @@ import urllib.parse
 import urllib.request
 from typing import Optional
 
+import uuid
+
 _lock = threading.RLock()
 _loaded = False
 _base: Optional[str] = None
 _key: Optional[str] = None
+
+
+def uid(value) -> str:
+    """Deterministic UUID for opaque string identifiers in UUID columns."""
+    if value is None:
+        return "00000000-0000-0000-0000-000000000000"
+    return str(uuid.uuid5(uuid.NAMESPACE_DNS, str(value)))
 
 
 def _load_env() -> None:

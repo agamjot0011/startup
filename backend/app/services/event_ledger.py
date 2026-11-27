@@ -106,6 +106,16 @@ class EventLedger:
             if self._order:
                 self._head_hash = self._events[self._order[-1]].event_hash
             self._loaded = True
+            for row in supabase_store.select("idempotency_records", limit=5000):
+                key = row.get("idempotency_key", "")
+                if ":" not in key:
+                    continue
+                scope, idem_key = key.split(":", 1)
+                self._idempotency[(scope, idem_key)] = IdempotencyRecord(
+                    scope=scope, key=idem_key,
+                    request_hash=row.get("request_hash") or "",
+                    status="completed", response=row.get("response_body"),
+                )
 
     def append(
         self,
@@ -165,11 +175,22 @@ class EventLedger:
                 self._events[correction_of].superseded_by = event_id
                 supabase_store.update("care_events", {"event_id": f"eq.{correction_of}"}, {"superseded_by": event_id})
             if enqueue:
-                self._outbox.append(OutboxMessage(
+                message = OutboxMessage(
                     outbox_id=str(uuid.uuid4()), practice_id=practice_id,
                     event_type=event_type, aggregate_type="patient", aggregate_id=patient_id,
                     payload=body,
-                ))
+                )
+                self._outbox.append(message)
+                supabase_store.insert("outbox_messages", {
+                    "id": supabase_store.uid(message.outbox_id),
+                    "practice_id": supabase_store.uid(practice_id or "wzdm-01"),
+                    "event_type": event_type,
+                    "aggregate_type": "patient",
+                    "payload": body,
+                    "status": "pending",
+                    "attempts": 0,
+                    "created_at": message.created_at,
+                })
             return event
 
     def correct(self, event_id: str, *, payload: dict, reason: str, actor_user_id: Optional[str]) -> CareEvent:
@@ -261,6 +282,10 @@ class EventLedger:
                     message.status = "dispatched"
                     message.attempts += 1
                     message.dispatched_at = datetime.now(timezone.utc).isoformat()
+                    supabase_store.update("outbox_messages", {"id": f"eq.{supabase_store.uid(message.outbox_id)}"}, {
+                        "status": "dispatched", "attempts": message.attempts,
+                        "dispatched_at": message.dispatched_at,
+                    })
                     count += 1
             return count
 
@@ -276,9 +301,19 @@ class EventLedger:
                     raise AuthzError("IDEMPOTENCY_KEY_REUSE", 409)
                 return existing.response or {}, True
             response = fn()
-            self._idempotency[(scope, key)] = IdempotencyRecord(
+            record = IdempotencyRecord(
                 scope=scope, key=key, request_hash=request_hash, status="completed", response=response
             )
+            self._idempotency[(scope, key)] = record
+            supabase_store.insert("idempotency_records", {
+                "id": supabase_store.uid(f"{scope}:{key}"),
+                "practice_id": supabase_store.uid("wzdm-01"),
+                "idempotency_key": f"{scope}:{key}",
+                "request_hash": request_hash,
+                "response_status": 200,
+                "response_body": response,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            })
             return response, False
 
 

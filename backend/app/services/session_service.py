@@ -59,7 +59,7 @@ class SessionStore:
         self.audit_entries: list[dict] = []
 
     def _log(self, action: str, session: Optional[SessionRecord], detail: str = "") -> None:
-        self.audit_entries.append({
+        entry = {
             "audit_id": str(uuid.uuid4()),
             "action": action,
             "user_id": session.user_id if session else None,
@@ -67,6 +67,21 @@ class SessionStore:
             "practice_id": session.active_practice_id if session else None,
             "detail": detail,
             "at": datetime.now(timezone.utc).isoformat(),
+        }
+        self.audit_entries.append(entry)
+        supabase_store.insert("audit_entries", {
+            "id": supabase_store.uid(entry["audit_id"]),
+            "practice_id": supabase_store.uid(entry["practice_id"] or "wzdm-01"),
+            "action": action,
+            "resource_type": "session",
+            "metadata": {
+                "audit_id": entry["audit_id"],
+                "session_id": entry["session_id"],
+                "user_id": entry["user_id"],
+                "practice_id": entry["practice_id"],
+                "detail": detail,
+            },
+            "created_at": entry["at"],
         })
 
     def create(

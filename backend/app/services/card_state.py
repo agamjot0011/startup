@@ -15,6 +15,7 @@ from typing import Optional
 
 from app.services.authz_service import AuthzError
 from app.services.event_ledger import event_ledger
+from app.services import supabase_store
 from app.services.session_service import SessionRecord
 
 OPEN = "OPEN"
@@ -104,6 +105,7 @@ class CardService:
             )
             self._cards[card.card_id] = card
             self._record(card, "card_created.v1", actor, source_id, {"card": card.public()})
+            supabase_store.save("cards", card, "card_id")
             return card
 
     def get(self, card_id: str) -> Card:
@@ -145,6 +147,7 @@ class CardService:
             mutate(card)
             card.row_version += 1
             self._record(card, event_type, actor, card_id, payload)
+            supabase_store.save("cards", card, "card_id")
             return card
 
     def acknowledge(self, card_id, actor=None, expected_version=None):
@@ -195,6 +198,7 @@ class CardService:
             card.owner_role = new_owner_role
             card.row_version += 1
             self._record(card, "card_reassigned.v1", actor, card_id, {"owner": new_owner_membership_id})
+            supabase_store.save("cards", card, "card_id")
             return card
 
     def reschedule(self, card_id, new_deadline, actor=None, expected_version=None):
@@ -207,6 +211,7 @@ class CardService:
             card.deadline = new_deadline
             card.row_version += 1
             self._record(card, "card_rescheduled.v1", actor, card_id, {"deadline": new_deadline})
+            supabase_store.save("cards", card, "card_id")
             return card
 
 

@@ -21,6 +21,7 @@ from datetime import datetime, timezone
 from typing import Callable, Optional
 
 from app.services.authz_service import AuthzError
+from app.services import supabase_store
 
 
 @dataclass
@@ -76,6 +77,32 @@ class EventLedger:
         self._idempotency: dict[tuple[str, str], IdempotencyRecord] = {}
         self._lock = threading.RLock()
         self._head_hash = "0" * 64
+        self._loaded = False
+
+    def _load(self) -> None:
+        with self._lock:
+            if self._loaded:
+                return
+            rows = supabase_store.select("care_events", order="recorded_at.asc", limit=5000)
+            for row in rows:
+                event = CareEvent(
+                    event_id=row["event_id"], practice_id=row["practice_id"],
+                    patient_id=row["patient_id"], event_type=row["event_type"],
+                    source_type=row["source_type"], source_id=row["source_id"],
+                    payload=row.get("payload") or {},
+                    actor_user_id=row.get("actor_user_id"), recorded_at=row["recorded_at"],
+                    prev_hash=row["prev_hash"], event_hash=row["event_hash"],
+                    correction_of=row.get("correction_of"),
+                    correction_reason=row.get("correction_reason"),
+                    superseded_by=row.get("superseded_by"),
+                )
+                if event.event_id in self._events:
+                    continue
+                self._events[event.event_id] = event
+                self._order.append(event.event_id)
+            if self._order:
+                self._head_hash = self._events[self._order[-1]].event_hash
+            self._loaded = True
 
     def append(
         self,
@@ -92,6 +119,7 @@ class EventLedger:
         enqueue: bool = True,
     ) -> CareEvent:
         with self._lock:
+            self._load()
             if correction_of and correction_of not in self._events:
                 raise AuthzError("UNKNOWN_SOURCE_EVENT", 404)
             event_id = str(uuid.uuid4())
@@ -121,8 +149,18 @@ class EventLedger:
             self._events[event_id] = event
             self._order.append(event_id)
             self._head_hash = event_hash
+            supabase_store.upsert("care_events", {
+                "event_id": event.event_id, "practice_id": event.practice_id,
+                "patient_id": event.patient_id, "event_type": event.event_type,
+                "source_type": event.source_type, "source_id": event.source_id,
+                "payload": json.dumps(event.payload), "actor_user_id": event.actor_user_id,
+                "recorded_at": event.recorded_at, "prev_hash": event.prev_hash,
+                "event_hash": event.event_hash, "correction_of": event.correction_of,
+                "correction_reason": event.correction_reason, "superseded_by": event.superseded_by,
+            }, "event_id")
             if correction_of:
                 self._events[correction_of].superseded_by = event_id
+                supabase_store.update("care_events", {"event_id": f"eq.{correction_of}"}, {"superseded_by": event_id})
             if enqueue:
                 self._outbox.append(OutboxMessage(
                     outbox_id=str(uuid.uuid4()), practice_id=practice_id,
@@ -146,12 +184,14 @@ class EventLedger:
         )
 
     def get(self, event_id: str) -> CareEvent:
+        self._load()
         event = self._events.get(event_id)
         if event is None:
             raise AuthzError("EVENT_NOT_FOUND", 404)
         return event
 
     def timeline(self, practice_id: str, patient_id: str) -> list[dict]:
+        self._load()
         return [
             {
                 "event_id": e.event_id,
@@ -186,6 +226,7 @@ class EventLedger:
         }
 
     def verify(self) -> bool:
+        self._load()
         with self._lock:
             prev = "0" * 64
             for event_id in self._order:

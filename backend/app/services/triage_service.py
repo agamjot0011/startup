@@ -18,6 +18,7 @@ from app.services.authz_service import AuthzError
 from app.services.card_state import card_service
 from app.services.event_ledger import event_ledger
 from app.services.session_service import SessionRecord
+from app.services import supabase_store
 
 URGENCIES = {"routine", "priority", "urgent"}
 APPROVED_INSTRUCTIONS = {
@@ -81,6 +82,7 @@ class TriageService:
                 photo_attached=photo_attached,
             )
             self._reports[report.report_id] = report
+            supabase_store.save("problem_reports", report, "report_id")
             event_ledger.append(
                 practice_id=practice_id, patient_id=patient_id,
                 event_type="problem_reported.v1", source_type="family_form",
@@ -127,6 +129,11 @@ class TriageService:
             report.triaged_by = actor.user_id
             report.triaged_at = datetime.now(timezone.utc).isoformat()
             report.status = "TRIAGED"
+            supabase_store.update("problem_reports", {"report_id": f"eq.{report.report_id}"}, {
+                "status": report.status, "urgency": report.urgency,
+                "approved_instruction": report.approved_instruction,
+                "triaged_by": report.triaged_by, "triaged_at": report.triaged_at,
+            })
             event_ledger.append(
                 practice_id=report.practice_id, patient_id=report.patient_id,
                 event_type="problem_report_triaged.v1", source_type="human_triage_command",

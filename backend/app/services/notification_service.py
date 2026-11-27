@@ -22,6 +22,7 @@ from typing import Optional
 
 from app.services.authz_service import AuthzError
 from app.services.event_ledger import event_ledger
+from app.services import supabase_store
 
 QUIET_START = time(22, 0)
 QUIET_END = time(7, 0)
@@ -93,6 +94,7 @@ class NotificationService:
 
     def configure_provider(self, site_id: str, sms: bool, email: bool) -> None:
         self._providers[site_id] = ProviderConfig(site_id, sms, email)
+        supabase_store.upsert("provider_configs", {"site_id": site_id, "sms_enabled": sms, "email_enabled": email}, "site_id")
 
     def _not_before(self, now: datetime, urgent: bool) -> datetime:
         if urgent:
@@ -157,6 +159,7 @@ class NotificationService:
                         command.provider = channel
                         self._sent_today[budget_key] = used + 1
             self._commands[command.command_id] = command
+            supabase_store.save("notification_commands", command, "command_id")
             event_ledger.append(
                 practice_id=practice_id, patient_id=patient_id,
                 event_type="notification_commanded.v1", source_type="notification_pipeline",
@@ -177,6 +180,7 @@ class NotificationService:
                     continue
                 command.status = "DISPATCHED"
                 command.attempts += 1
+                supabase_store.update("notification_commands", {"command_id": f"eq.{command.command_id}"}, {"status": "DISPATCHED", "attempts": command.attempts})
                 dispatched += 1
         return {"dispatched": dispatched, "deferred": deferred}
 

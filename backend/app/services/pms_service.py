@@ -11,6 +11,7 @@ from __future__ import annotations
 import csv
 import hashlib
 import io
+import json
 import threading
 import uuid
 from dataclasses import dataclass, field
@@ -19,6 +20,7 @@ from typing import Optional
 
 from app.services.authz_service import AuthzError
 from app.services.event_ledger import event_ledger
+from app.services import supabase_store
 
 REQUIRED_FIELDS = ("patient_ref", "event_date", "event_type")
 ALLOWED_EVENT_TYPES = {"visit", "adjustment", "debond", "bond_check"}
@@ -99,6 +101,13 @@ class PMSService:
             for i, row in enumerate(reader, start=1):
                 batch.rows.append(ImportRow(row_number=i, raw=dict(row)))
             self._batches[batch.import_id] = batch
+            supabase_store.save("import_batches", batch, "import_id", exclude=("rows",))
+            supabase_store.insert("import_rows", [
+                {"import_id": batch.import_id, "row_number": r.row_number,
+                 "raw": json.dumps(r.raw), "normalized": json.dumps(r.normalized),
+                 "status": r.status, "issues": json.dumps(r.issues)}
+                for r in batch.rows
+            ])
             return batch
 
     def get(self, import_id: str) -> ImportBatch:
@@ -175,6 +184,7 @@ class PMSService:
                 written += 1
             batch.state = "COMMITTED"
             batch.committed_at = datetime.now(timezone.utc).isoformat()
+            supabase_store.update("import_batches", {"import_id": f"eq.{import_id}"}, {"state": "COMMITTED", "committed_at": batch.committed_at})
             self._committed_hashes[key] = import_id
             return {
                 "import_id": import_id, "state": "COMMITTED",

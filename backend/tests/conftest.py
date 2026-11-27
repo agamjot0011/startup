@@ -1,6 +1,9 @@
 import os
 import sys
 
+# Tests must never touch the live Supabase project.
+os.environ["WZDM_PERSISTENCE"] = "0"
+
 # Ensure the backend's site-packages is at the front of sys.path
 # so it's picked up before the hermes-agent environment
 backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

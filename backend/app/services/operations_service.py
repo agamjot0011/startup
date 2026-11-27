@@ -17,6 +17,7 @@ from typing import Optional
 from app.services.authz_service import AuthzError
 from app.services.event_ledger import event_ledger
 from app.services.session_service import SessionRecord
+from app.services import supabase_store
 
 CHECKLIST_VERSION = "chair-v3"
 
@@ -121,6 +122,7 @@ class OperationsService:
                 captured_at=datetime.now(timezone.utc).isoformat(),
             )
             self._captures[capture.capture_id] = capture
+            supabase_store.save("chairside_captures", capture, "capture_id")
             event_ledger.append(
                 practice_id=appointment.practice_id, patient_id=patient_id,
                 event_type="chairside_capture_recorded.v1", source_type="chair_capture",
@@ -155,6 +157,7 @@ class OperationsService:
                 text=text, owner_membership_id=owner_membership_id, due_at=due_at,
             )
             self._promises[promise.promise_id] = promise
+            supabase_store.save("promises", promise, "promise_id")
             event_ledger.append(
                 practice_id=practice_id, patient_id=patient_id,
                 event_type="promise_made.v1", source_type="front_desk",

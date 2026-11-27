@@ -16,6 +16,7 @@ from typing import Optional
 from app.services.authz_service import AuthzError
 from app.services.event_ledger import event_ledger
 from app.services.session_service import SessionRecord
+from app.services import supabase_store
 
 
 class MessagingError(Exception):
@@ -62,6 +63,7 @@ class MessagingService:
                 published_at=datetime.now(timezone.utc).isoformat(),
             )
             self._messages[message.message_id] = message
+            supabase_store.save("messages", message, "message_id")
             event_ledger.append(
                 practice_id=practice_id, patient_id=patient_id,
                 event_type="in_app_message_published.v1", source_type="staff_message",
@@ -91,6 +93,10 @@ class MessagingService:
                 "is_acknowledgement": False,
             }
             message.views.append(entry)
+            supabase_store.insert("message_views", {
+                "message_id": message.message_id, "viewer_user_id": actor.user_id,
+                "viewed_at": entry["viewed_at"], "is_acknowledgement": False,
+            })
             event_ledger.append(
                 practice_id=message.practice_id, patient_id=message.patient_id,
                 event_type="message_viewed.v1", source_type="in_app_view",

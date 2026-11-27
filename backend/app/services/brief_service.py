@@ -18,6 +18,7 @@ from typing import Optional
 from app.services.authz_service import AuthzError
 from app.services.event_ledger import event_ledger
 from app.services.session_service import SessionRecord, session_store
+from app.services import supabase_store
 
 
 def _hash(value: dict) -> str:
@@ -106,6 +107,7 @@ class BriefService:
                 generated_at=datetime.now(timezone.utc).isoformat(),
             )
             self._briefs[brief.brief_id] = brief
+            supabase_store.save("visit_briefs", brief, "brief_id", exclude=("signatures",))
             event_ledger.append(
                 practice_id=practice_id, patient_id=patient_id,
                 event_type="visit_brief_generated.v1", source_type="brief_projection",
@@ -156,6 +158,7 @@ class BriefService:
             )
             brief.signatures.append(signature)
             self._signatures[signature.signature_id] = signature
+            supabase_store.save("brief_signatures", signature, "signature_id")
             event_ledger.append(
                 practice_id=brief.practice_id, patient_id=brief.patient_id,
                 event_type="visit_brief_signed.v1", source_type="doctor_signature",
@@ -184,6 +187,7 @@ class BriefService:
             )
             replacement.row_version = original.row_version + 1
             original.superseded_by = replacement.brief_id
+            supabase_store.update("visit_briefs", {"brief_id": f"eq.{brief_id}"}, {"superseded_by": replacement.brief_id})
             event_ledger.append(
                 practice_id=original.practice_id, patient_id=original.patient_id,
                 event_type="visit_brief_superseded.v1", source_type="doctor_supersession",

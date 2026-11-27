@@ -19,6 +19,7 @@ from typing import Optional
 from app.services.authz_service import AuthzError
 from app.services.event_ledger import event_ledger
 from app.services.session_service import SessionRecord
+from app.services import supabase_store
 
 DRAFT = "DRAFT"
 SUBMITTED = "SUBMITTED"
@@ -107,6 +108,7 @@ class GovernanceService:
                 locale=body.get("locale", "en"),
             )
             self._items.setdefault(item_id, []).append(version)
+            supabase_store.save("governed_versions", version, "version_id")
             self._versions[version.version_id] = version
             if replaces and replaces in self._versions:
                 previous = self._versions[replaces]
@@ -133,6 +135,7 @@ class GovernanceService:
             if version.state != DRAFT:
                 raise GovernanceError("INVALID_STATE", 409, version.state)
             version.state = SUBMITTED
+            supabase_store.update("governed_versions", {"version_id": f"eq.{version_id}"}, {"state": SUBMITTED})
             return version
 
     def approve(self, version_id: str, approver: SessionRecord) -> Version:
@@ -147,6 +150,7 @@ class GovernanceService:
             version.state = APPROVED
             version.approver_user_id = approver.user_id
             version.approved_at = datetime.now(timezone.utc).isoformat()
+            supabase_store.update("governed_versions", {"version_id": f"eq.{version_id}"}, {"state": APPROVED, "approver_user_id": approver.user_id, "approved_at": version.approved_at})
             return version
 
     def activate(self, version_id: str, actor: SessionRecord, effective_from: Optional[str] = None) -> Version:
@@ -160,6 +164,7 @@ class GovernanceService:
             version.state = ACTIVE
             version.activated_at = datetime.now(timezone.utc).isoformat()
             version.effective_from = effective_from or version.activated_at
+            supabase_store.update("governed_versions", {"version_id": f"eq.{version_id}"}, {"state": ACTIVE, "activated_at": version.activated_at, "effective_from": version.effective_from})
             for other in self._items[version.item_id]:
                 if other.version_id != version_id and other.state == ACTIVE:
                     other.state = WITHDRAWN
@@ -174,6 +179,7 @@ class GovernanceService:
             version.state = WITHDRAWN
             version.withdrawn_at = datetime.now(timezone.utc).isoformat()
             version.withdrawal_reason = reason
+            supabase_store.update("governed_versions", {"version_id": f"eq.{version_id}"}, {"state": WITHDRAWN, "withdrawn_at": version.withdrawn_at, "withdrawal_reason": reason})
             return version
 
     def active_versions(self, kind: Optional[str] = None) -> list[Version]:

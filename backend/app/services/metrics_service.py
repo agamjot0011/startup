@@ -17,6 +17,7 @@ from typing import Optional
 from app.services.authz_service import AuthzError
 from app.services.event_ledger import event_ledger
 from app.services.session_service import session_store
+from app.services import supabase_store
 
 
 @dataclass
@@ -103,6 +104,7 @@ class MetricsService:
                     numerator=numerator, denominator=denominator, value=value,
                     input_hash=digest, computed_at=datetime.now(timezone.utc).isoformat(),
                 )
+                supabase_store.upsert("metric_facts", self._facts[metric_id].public(), "metric_id")
             return list(self._facts.values())
 
     def verify(self) -> dict:

@@ -111,10 +111,10 @@ def test_v1_patient_family_home():
 
 
 def test_v1_patient_timeline():
-    response = client.get("/v1/patients/synthetic/timeline")
+    token = client.post("/v1/sessions", json={"session": "api-timeline-test", "password": "x"}).json()["session_id"]
+    response = client.get("/v1/patients/synthetic/timeline", headers={"Authorization": f"Bearer {token}"})
     assert response.status_code == 200
-    body = response.json()
-    assert "events" in body
+    assert isinstance(response.json(), list)
 
 
 def test_v1_patient_enrolment():
@@ -197,10 +197,10 @@ def test_v1_access_link():
 
 
 def test_v1_cards():
-    response = client.get("/v1/cards")
+    token = client.post("/v1/sessions", json={"session": "api-cards-test", "password": "x"}).json()["session_id"]
+    response = client.get("/v1/cards", headers={"Authorization": f"Bearer {token}"})
     assert response.status_code == 200
-    body = response.json()
-    assert "cards" in body
+    assert isinstance(response.json(), list)
 
 
 def test_v1_card_detail():

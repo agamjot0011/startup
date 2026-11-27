@@ -1,4 +1,10 @@
-from fastapi import APIRouter
+from datetime import datetime, timezone
+
+from fastapi import APIRouter, Depends
+
+from app.api.routes.auth import current_session
+from app.services.card_state import card_service
+from app.services.session_service import SessionRecord
 
 router = APIRouter(prefix="/v1/cards", tags=["Cards"])
 
@@ -9,23 +15,42 @@ router = APIRouter(prefix="/v1/cards", tags=["Cards"])
 
 
 @router.get("")
-def list_cards():
-    """
-    Get the role-filtered card inbox.
-    """
-    return {
-        "cards": [
-            {
-                "card_id": "synthetic",
-                "card_type": "care_loop",
-                "status": "available",
-                "owner": "synthetic",
-                "deadline_at": "2026-11-26T09:00:00Z",
-                "loop_id": "synthetic",
-            }
-        ],
-        "next_cursor": None,
+def list_cards(session: SessionRecord = Depends(current_session)):
+    """Role-filtered card inbox, backed by the persisted card state."""
+    def due_label(deadline: str) -> str:
+        try:
+            day = datetime.fromisoformat(deadline.replace("Z", "+00:00")).date()
+            days = (day - datetime.now(timezone.utc).date()).days
+            if days <= 0:
+                return "Today"
+            if days == 1:
+                return "Tomorrow"
+            return f"In {days} days"
+        except (ValueError, TypeError):
+            return "Today"
+
+    state_map = {
+        "OPEN": "open", "ACKNOWLEDGED": "acknowledged",
+        "STARTED": "active", "RESULT_RECORDED": "active",
+        "CLOSED": "done", "CANCELLED": "done",
     }
+    cards = []
+    for card in card_service.list_for_practice(session.active_practice_id):
+        due = due_label(card.deadline)
+        cards.append({
+            "id": card.card_id, "card_id": card.card_id,
+            "title": card.card_type.replace("_", " ").title(),
+            "patient": card.patient_id,
+            "role": card.owner_role.replace("_", " ").title() if card.owner_role else "Unassigned",
+            "due": due,
+            "state": state_map.get(card.state, "open"),
+            "tone": "due" if due == "Today" else "neutral",
+            "card_type": card.card_type, "deadline": card.deadline,
+            "owner_membership_id": card.owner_membership_id,
+            "owner_role": card.owner_role, "row_version": card.row_version,
+            "result_code": card.result_code,
+        })
+    return cards
 
 
 @router.get("/{card_id}")

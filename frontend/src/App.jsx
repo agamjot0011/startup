@@ -594,7 +594,7 @@ const TIMELINE = [
 function StaffInbox() {
   const [filter, setFilter] = useState('all')
   const live = useApiData('/v1/cards', null)
-  const cards = Array.isArray(live) && live.length ? live : CARDS
+  const cards = Array.isArray(live) ? live : CARDS
   const visible = filter === 'all' ? cards : cards.filter((c) => c.state === filter)
   const dueOrder = { Today: 0, Tomorrow: 1, 'In 2 days': 2, 'In 3 days': 3 }
   const inScope = filter === 'due' ? cards.filter((c) => c.due === 'Today') : visible
@@ -640,7 +640,7 @@ function StaffInbox() {
 function PatientTimeline({ family = false }) {
   const { patientId } = useParams()
   const rows = useApiData(`/v1/patients/${patientId || 'p-1042'}/timeline`, TIMELINE)
-  const events = Array.isArray(rows) && rows.length ? rows : TIMELINE
+  const events = Array.isArray(rows) ? rows : TIMELINE
   return (
     <>
       <PageHeader eyebrow={family ? 'Family access · scoped' : 'Patient care'} title="Timeline"

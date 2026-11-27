@@ -77,7 +77,28 @@ class CardStateError(Exception):
 class CardService:
     def __init__(self) -> None:
         self._cards: dict[str, Card] = {}
+        self._loaded = False
         self._lock = threading.RLock()
+
+    def _load(self) -> None:
+        if self._loaded:
+            return
+        with self._lock:
+            if self._loaded:
+                return
+            for row in supabase_store.select("cards", limit=5000):
+                card = Card(
+                    card_id=row["card_id"], practice_id=row["practice_id"],
+                    patient_id=row["patient_id"], card_type=row["card_type"],
+                    state=row["state"], owner_membership_id=row.get("owner_membership_id") or "",
+                    owner_role=row.get("owner_role") or "", deadline=row.get("deadline") or "",
+                    row_version=row.get("row_version") or 1,
+                    result_code=row.get("result_code"),
+                    cancellation_reason=row.get("cancellation_reason"),
+                    created_at=row.get("created_at") or "",
+                )
+                self._cards[card.card_id] = card
+            self._loaded = True
 
     def create(
         self,
@@ -109,12 +130,14 @@ class CardService:
             return card
 
     def get(self, card_id: str) -> Card:
+        self._load()
         card = self._cards.get(card_id)
         if card is None:
             raise CardStateError("CARD_NOT_FOUND", 404)
         return card
 
     def list_for_practice(self, practice_id: str) -> list[Card]:
+        self._load()
         return [c for c in self._cards.values() if c.practice_id == practice_id]
 
     def _record(self, card: Card, event_type: str, actor: Optional[SessionRecord], source_id: str, payload: dict) -> None:

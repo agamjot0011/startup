@@ -1,4 +1,10 @@
-from fastapi import APIRouter
+from datetime import datetime
+
+from fastapi import APIRouter, Depends
+
+from app.api.routes.auth import current_session
+from app.services.event_ledger import event_ledger
+from app.services.session_service import SessionRecord
 
 router = APIRouter(prefix="/v1/patients", tags=["Patients"])
 
@@ -45,22 +51,24 @@ def family_home(patient_id: str):
 
 
 @router.get("/{patient_id}/timeline")
-def get_patient_timeline(patient_id: str):
-    """
-    Role/privacy-filtered patient timeline with signed cursor.
-    """
-    return {
-        "events": [
-            {
-                "event_id": "synthetic",
-                "event_type": "patient_enrolled.v1",
-                "occurred_at": "2026-11-25T10:00:00Z",
-                "recorded_at": "2026-11-25T10:01:00Z",
-                "privacy_scope": "PATIENT_PRIVATE",
-            }
-        ],
-        "next_cursor": "synthetic",
-    }
+def get_patient_timeline(patient_id: str, session: SessionRecord = Depends(current_session)):
+    """Role/privacy-filtered patient timeline from the persisted event ledger."""
+    events = []
+    for e in event_ledger.timeline(session.active_practice_id, patient_id):
+        try:
+            date = datetime.fromisoformat(e["recorded_at"].replace("Z", "+00:00")).strftime("%d %b %Y")
+        except (ValueError, TypeError):
+            date = e["recorded_at"][:10]
+        kind = e["event_type"].split(".")[0].replace("_", " ").title()
+        events.append({
+            "id": e["event_id"], "date": date, "type": kind,
+            "title": e["event_type"].replace(".v1", "").replace("_", " ").title(),
+            "source": e["source_type"].replace("_", " ").title(),
+            "freshness": "Verified", "tone": "success",
+            "event_id": e["event_id"], "event_type": e["event_type"],
+            "recorded_at": e["recorded_at"], "event_hash": e["event_hash"],
+        })
+    return events
 
 
 @router.post("/{patient_id}/enrolments")

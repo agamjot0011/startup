@@ -73,8 +73,12 @@ def request(method: str, table: str, *, params: Optional[dict] = None, body: Opt
         return None
 
 
-def save(table: str, obj, key_field: str, exclude: tuple = ()) -> None:
-    """Mirror a dataclass instance into a Supabase table."""
+def save(table: str, obj, key_field: str, exclude: tuple = (), json_text: tuple = ()) -> None:
+    """Mirror a dataclass instance into a Supabase table.
+
+    jsonb columns must receive native JSON values; only text columns that
+    hold JSON need explicit json.dumps (listed in json_text).
+    """
     from dataclasses import asdict
 
     row = asdict(obj)
@@ -82,7 +86,7 @@ def save(table: str, obj, key_field: str, exclude: tuple = ()) -> None:
     for field, value in row.items():
         if field in exclude:
             continue
-        if isinstance(value, (dict, list)):
+        if field in json_text:
             encoded[field] = json.dumps(value)
         else:
             encoded[field] = value

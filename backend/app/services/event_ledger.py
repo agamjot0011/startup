@@ -85,11 +85,14 @@ class EventLedger:
                 return
             rows = supabase_store.select("care_events", order="recorded_at.asc", limit=5000)
             for row in rows:
+                payload = row.get("payload") or {}
+                if isinstance(payload, str):
+                    payload = json.loads(payload)
                 event = CareEvent(
                     event_id=row["event_id"], practice_id=row["practice_id"],
                     patient_id=row["patient_id"], event_type=row["event_type"],
                     source_type=row["source_type"], source_id=row["source_id"],
-                    payload=row.get("payload") or {},
+                    payload=payload,
                     actor_user_id=row.get("actor_user_id"), recorded_at=row["recorded_at"],
                     prev_hash=row["prev_hash"], event_hash=row["event_hash"],
                     correction_of=row.get("correction_of"),
@@ -153,7 +156,7 @@ class EventLedger:
                 "event_id": event.event_id, "practice_id": event.practice_id,
                 "patient_id": event.patient_id, "event_type": event.event_type,
                 "source_type": event.source_type, "source_id": event.source_id,
-                "payload": json.dumps(event.payload), "actor_user_id": event.actor_user_id,
+                "payload": event.payload, "actor_user_id": event.actor_user_id,
                 "recorded_at": event.recorded_at, "prev_hash": event.prev_hash,
                 "event_hash": event.event_hash, "correction_of": event.correction_of,
                 "correction_reason": event.correction_reason, "superseded_by": event.superseded_by,

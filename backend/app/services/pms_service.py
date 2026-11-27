@@ -104,8 +104,8 @@ class PMSService:
             supabase_store.save("import_batches", batch, "import_id", exclude=("rows",))
             supabase_store.insert("import_rows", [
                 {"import_id": batch.import_id, "row_number": r.row_number,
-                 "raw": json.dumps(r.raw), "normalized": json.dumps(r.normalized),
-                 "status": r.status, "issues": json.dumps(r.issues)}
+                 "raw": r.raw, "normalized": r.normalized,
+                 "status": r.status, "issues": r.issues}
                 for r in batch.rows
             ])
             return batch

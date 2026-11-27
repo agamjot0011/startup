@@ -16,6 +16,7 @@ class Patient(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     practice_id = Column(UUID(as_uuid=True), ForeignKey("practices.id", ondelete="CASCADE"), nullable=False)
+    external_id = Column(String)
     status = Column(String, nullable=False, default="active")
     given_name = Column(String)
     family_name = Column(String)

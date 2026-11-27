@@ -1,11 +1,14 @@
 from collections.abc import Generator
+from typing import Optional
 from urllib.parse import urlparse
 
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.orm import Session, declarative_base, sessionmaker
 
 from app.core.config import settings
+
+Base = declarative_base()
 
 
 def _get_supabase_db_url() -> Optional[str]:
